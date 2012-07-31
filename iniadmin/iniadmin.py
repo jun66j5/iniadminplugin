@@ -32,22 +32,22 @@ class IniAdminPlugin(Component):
     # IAdminPageProvider methods
     def get_admin_panels(self, req):
         if req.perm.has_permission('TRAC_ADMIN'):
-            excludes_re = self._patterns_re(self.excludes)
-            for section in sorted(self._get_sections_set(excludes_re)):
+            excludes_match = self._patterns_match(self.excludes)
+            for section in sorted(self._get_sections_set(excludes_match)):
                 yield ('tracini', 'trac.ini', section, section)
 
     def render_admin_panel(self, req, cat, page, path_info):
         assert req.perm.has_permission('TRAC_ADMIN')
 
-        excludes_re = self._patterns_re(self.excludes)
-        if page not in self._get_sections_set(excludes_re):
+        excludes_match = self._patterns_match(self.excludes)
+        if page not in self._get_sections_set(excludes_match):
             raise TracError("Invalid section %s" % page)
 
         options = sorted(
             [option for (section, name), option
                     in Option.registry.iteritems()
                     if section == page and \
-                       not excludes_re.match('%s:%s' % (section, name))],
+                       not excludes_match('%s:%s' % (section, name))],
             key=lambda opt: opt.name)
 
         # Apply changes
@@ -65,7 +65,7 @@ class IniAdminPlugin(Component):
 
         add_stylesheet(req, 'iniadmin/css/iniadmin.css')
 
-        passwords_re = self._patterns_re(self.passwords)
+        password_match = self._patterns_match(self.passwords)
         options_data = []
         for option in options:
             doc = wiki_to_html(to_unicode(inspect.getdoc(option)),
@@ -82,7 +82,7 @@ class IniAdminPlugin(Component):
                     impl.__class__.__name__
                     for impl in option.xtnpt.extensions(self))
             elif type == 'text' and \
-                 passwords_re.match('%s:%s' % (option.section, option.name)):
+                 password_match('%s:%s' % (option.section, option.name)):
                 option_data['type'] = 'password'
             options_data.append(option_data)
 
@@ -98,15 +98,14 @@ class IniAdminPlugin(Component):
         from pkg_resources import resource_filename
         return [('iniadmin', resource_filename(__name__, 'htdocs'))]
 
-    def _get_sections_set(self, excludes_re):
+    def _get_sections_set(self, excludes_match):
         return set([section
                     for section, name in Option.registry
-                    if excludes_re and \
-                       not excludes_re.match('%s:%s' % (section, name))])
+                    if not excludes_match('%s:%s' % (section, name))])
 
-    def _patterns_re(self, patterns):
+    def _patterns_match(self, patterns):
         if not patterns:
-            return None
+            return lambda val: False
 
         wildcard_re = re.compile('([*?]+)|([^*?A-Za-z0-9_]+)')
         def replace(match):
@@ -117,6 +116,7 @@ class IniAdminPlugin(Component):
                 return '[^:]*'
             return re.escape(group(2))
 
-        return re.compile(r'\A(?:%s)\Z' % \
-                          '|'.join([wildcard_re.sub(replace, pattern)
-                                    for pattern in patterns]))
+        patterns_re = r'\A(?:%s)\Z' % \
+                      '|'.join([wildcard_re.sub(replace, pattern)
+                               for pattern in patterns])
+        return re.compile(patterns_re).match
