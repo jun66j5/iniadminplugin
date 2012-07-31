@@ -7,7 +7,7 @@ from trac.core import Component, implements, TracError
 from trac.admin.api import IAdminPanelProvider
 from trac.config import Option, ListOption
 from trac.util import Markup
-from trac.util.compat import set, sorted
+from trac.util.compat import set, sorted, any
 from trac.util.text import to_unicode
 from trac.web.chrome import ITemplateProvider, add_stylesheet
 from trac.wiki.formatter import wiki_to_html
@@ -53,10 +53,10 @@ class IniAdminPlugin(Component):
         # Apply changes
         if req.method == 'POST':
             modified = False
-            for option, value in req.args.iteritems():
-                if option in options:
-                    if self.config.get(page, option.name) != value:
-                        self.config.set(page, option.name, value)
+            for name, value in req.args.iteritems():
+                if any(name == opt.name for opt in options):
+                    if self.config.get(page, name) != value:
+                        self.config.set(page, name, value)
                         modified = True
             if modified:
                 self.log.debug("Updating trac.ini")
