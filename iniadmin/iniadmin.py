@@ -6,12 +6,13 @@ import re
 from trac.core import Component, implements, TracError
 from trac.admin.api import IAdminPanelProvider
 from trac.config import Option, ListOption
-from trac.util import Markup
 from trac.util.compat import set, sorted, any
 from trac.util.text import to_unicode
-from trac.util.translation import dgettext
 from trac.web.chrome import ITemplateProvider, add_stylesheet
-from trac.wiki.formatter import wiki_to_html
+try:
+    from trac.util.translation import dgettext
+except ImportError:
+    dgettext = lambda domain, string: string
 
 
 class IniAdminPlugin(Component):
@@ -69,14 +70,14 @@ class IniAdminPlugin(Component):
         password_match = self._patterns_match(self.passwords)
         options_data = []
         for option in options:
-            doc = wiki_to_html(self._get_doc(option), self.env, req)
+            doc = self._get_doc(option)
             value = self.config.get(page, option.name)
             # We assume the classes all end in "Option"
             type = option.__class__.__name__.lower()[:-6] or 'text'
             if type == 'list' and not isinstance(value,basestring):
                 value = unicode(option.sep).join(list(value))
-            option_data  = {'name': option.name, 'default': option.default,
-                            'doc': Markup(doc), 'value': value, 'type': type}
+            option_data = {'name': option.name, 'default': option.default,
+                           'doc': doc, 'value': value, 'type': type}
             if type == 'extension':
                 option_data['options'] = sorted(
                     impl.__class__.__name__
