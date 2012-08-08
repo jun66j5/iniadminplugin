@@ -9,6 +9,7 @@ from trac.config import Option, ListOption
 from trac.util import Markup
 from trac.util.compat import set, sorted, any
 from trac.util.text import to_unicode
+from trac.util.translation import dgettext
 from trac.web.chrome import ITemplateProvider, add_stylesheet
 from trac.wiki.formatter import wiki_to_html
 
@@ -68,8 +69,7 @@ class IniAdminPlugin(Component):
         password_match = self._patterns_match(self.passwords)
         options_data = []
         for option in options:
-            doc = wiki_to_html(to_unicode(inspect.getdoc(option)),
-                               self.env, req)
+            doc = wiki_to_html(self._get_doc(option), self.env, req)
             value = self.config.get(page, option.name)
             # We assume the classes all end in "Option"
             type = option.__class__.__name__.lower()[:-6] or 'text'
@@ -102,6 +102,12 @@ class IniAdminPlugin(Component):
         return set([section
                     for section, name in Option.registry
                     if not excludes_match('%s:%s' % (section, name))])
+
+    def _get_doc(self, obj):
+        doc = to_unicode(inspect.getdoc(obj))
+        if hasattr(obj, 'doc_domain'):
+            doc = dgettext(obj.doc_domain, doc)
+        return doc
 
     def _patterns_match(self, patterns):
         if not patterns:
